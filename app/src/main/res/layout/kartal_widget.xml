@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:padding="6dp">
+    <FrameLayout android:id="@+id/tap_area"
+        android:layout_width="match_parent" android:layout_height="match_parent"
+        android:background="@drawable/widget_bg">
+        <ImageView android:layout_width="240dp" android:layout_height="match_parent"
+            android:layout_gravity="right|center_vertical"
+            android:src="@drawable/eagle" android:scaleType="fitCenter"
+            android:contentDescription="@string/widget_description" />
+        <LinearLayout android:layout_width="match_parent"
+            android:layout_height="match_parent" android:orientation="vertical"
+            android:gravity="bottom" android:padding="18dp">
+            <TextView android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="BEŞİKTAŞ" android:textSize="22sp"
+                android:textStyle="bold" android:textColor="#FFFFFFFF"
+                android:shadowColor="#F0000000" android:shadowRadius="5" />
+            <TextView android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginTop="3dp"
+                android:text="Son xəbərlər   ›" android:textSize="13sp"
+                android:textColor="#FFE5E9EF"
+                android:shadowColor="#F0000000" android:shadowRadius="5" />
+        </LinearLayout>
+    </FrameLayout>
+</FrameLayout>
