@@ -201,10 +201,14 @@ public class MainActivity extends Activity {
                     }
                 });
             } catch (Exception ex) {
+                final String diagnostic = ex.getClass().getSimpleName()
+                    + (ex.getMessage() == null ? "" : ": " + ex.getMessage());
+                android.util.Log.e("BesiktasNews", "RSS yenilənmə xətası", ex);
                 handler.post(() -> {
                     if (!isFinishing() && request == currentRequest) {
                         status.setText("XƏTA");
-                        message("Xəbərlər yüklənmədi. İnternet bağlantısını yoxlayın və yenidən cəhd edin.");
+                        message("Xəbərlər yüklənmədi. Səbəb: " + diagnostic
+                            + "\n\nİnternet bağlantısını yoxlayın və yenidən cəhd edin.");
                     }
                 });
             }
@@ -219,10 +223,13 @@ public class MainActivity extends Activity {
             .appendQueryParameter("ceid", "TR:tr").build().toString();
         HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
         connection.setConnectTimeout(10000);
-        connection.setReadTimeout(12000);
-        connection.setRequestProperty("User-Agent", "Mozilla/5.0 (compatible; BeşiktaşKartalWidget/1.0)");
+        connection.setReadTimeout(16000);
+        connection.setRequestProperty("Cache-Control", "no-cache");
+        connection.setRequestProperty("Accept", "application/rss+xml, application/xml, text/xml;q=0.9");
+        connection.setRequestProperty("User-Agent", "Mozilla/5.0 (compatible; BesiktasKartalWidget/1.1)");
         try {
-            if (connection.getResponseCode() != 200) throw new Exception("Feed HTTP error");
+            int code = connection.getResponseCode();
+            if (code != 200) throw new Exception("HTTP " + code + " - Google News RSS servisinden cavab alinmadi");
             try (InputStream input = new BufferedInputStream(connection.getInputStream())) {
                 XmlPullParser xml = Xml.newPullParser();
                 xml.setInput(input, "UTF-8");
