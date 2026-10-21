@@ -28,6 +28,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
@@ -39,7 +40,7 @@ public class MainActivity extends Activity {
     private static final int MUTED = Color.rgb(175, 179, 190);
     private static final String[] CATEGORIES = {"Futbol", "Basketbol", "Transfer", "Klub"};
     private static final String[] SEARCHES = {
-        "Beşiktaş futbol", "Beşiktaş basketbol", "Beşiktaş transfer", "site:bjk.com.tr Beşiktaş"
+        "Beşiktaş futbol when:7d", "Beşiktaş basketbol when:7d", "Beşiktaş transfer when:7d", "site:bjk.com.tr Beşiktaş when:7d"
     };
     private final ExecutorService network = Executors.newSingleThreadExecutor();
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -184,6 +185,7 @@ public class MainActivity extends Activity {
         String url = "";
         String source = "";
         String date = "";
+        long publishedAt = 0L;
     }
 
     private void load() {
@@ -196,7 +198,7 @@ public class MainActivity extends Activity {
                 ArrayList<Item> results = retrieve(query);
                 handler.post(() -> {
                     if (!isFinishing() && request == currentRequest) {
-                        status.setText("CANLI LENT");
+                        status.setText("YENİLƏNDİ");
                         display(results);
                     }
                 });
@@ -224,7 +226,9 @@ public class MainActivity extends Activity {
         HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
         connection.setConnectTimeout(10000);
         connection.setReadTimeout(16000);
-        connection.setRequestProperty("Cache-Control", "no-cache");
+        connection.setUseCaches(false);
+        connection.setRequestProperty("Cache-Control", "no-cache, no-store, max-age=0");
+        connection.setRequestProperty("Pragma", "no-cache");
         connection.setRequestProperty("Accept", "application/rss+xml, application/xml, text/xml;q=0.9");
         connection.setRequestProperty("User-Agent", "Mozilla/5.0 (compatible; BesiktasKartalWidget/1.1)");
         try {
@@ -247,16 +251,28 @@ public class MainActivity extends Activity {
                             else if ("pubDate".equals(tag)) item.date = xml.nextText();
                         }
                     } else if (event == XmlPullParser.END_TAG && "item".equals(xml.getName()) && item != null) {
-                        if (!item.title.isEmpty() && item.url.startsWith("https://")) items.add(item);
+                        if (!item.title.isEmpty() && item.url.startsWith("https://")) {
+                            item.publishedAt = parseDate(item.date);
+                            items.add(item);
+                        }
                         item = null;
-                        if (items.size() >= 20) break;
+                        if (items.size() >= 100) break;
                     }
                 }
+                Collections.sort(items, (a, b) -> Long.compare(b.publishedAt, a.publishedAt));
+                if (items.size() > 20) return new ArrayList<>(items.subList(0, 20));
                 return items;
             }
         } finally {
             connection.disconnect();
         }
+    }
+
+    private static long parseDate(String raw) {
+        try {
+            Date parsed = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH).parse(raw);
+            return parsed == null ? 0L : parsed.getTime();
+        } catch (Exception ignored) { return 0L; }
     }
 
     private String clean(String raw) {
@@ -269,6 +285,22 @@ public class MainActivity extends Activity {
             message("Hazırda bu kateqoriyada xəbər tapılmadı.");
             return;
         }
+        long latest = results.get(0).publishedAt;
+        for (Item entry : results) latest = Math.max(latest, entry.publishedAt);
+        String key = "last_published_" + selected;
+        android.content.SharedPreferences prefs = getSharedPreferences("news_state", MODE_PRIVATE);
+        long last = prefs.getLong(key, 0L);
+        int freshCount = 0;
+        if (last > 0) for (Item entry : results) if (entry.publishedAt > last) freshCount++;
+        if (latest > last) prefs.edit().putLong(key, latest).apply();
+        String checkedAt = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
+        String report = last == 0
+            ? "Son yoxlama: " + checkedAt + " • " + results.size() + " xəbər"
+            : (freshCount == 0 ? "Yeni xəbər yoxdur" : freshCount + " yeni xəbər")
+                + " • Son yoxlama: " + checkedAt;
+        TextView info = text(report, 12, MUTED, false);
+        info.setPadding(dp(5), 0, dp(5), dp(13));
+        feed.addView(info);
         for (Item item : results) {
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.VERTICAL);
@@ -287,12 +319,9 @@ public class MainActivity extends Activity {
             title.setPadding(0, dp(9), 0, dp(10));
             card.addView(title);
 
-            String date = item.date;
-            try {
-                Date parsed = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.ENGLISH).parse(date);
-                if (parsed != null)
-                    date = new SimpleDateFormat("dd MMM • HH:mm", new Locale("tr", "TR")).format(parsed);
-            } catch (Exception ignored) { }
+            String date = item.publishedAt > 0
+                ? new SimpleDateFormat("dd MMM • HH:mm", new Locale("tr", "TR")).format(new Date(item.publishedAt))
+                : item.date;
             card.addView(text(date + "   ↗", 12, MUTED, false));
             card.setOnClickListener(v -> open(item.url));
         }
